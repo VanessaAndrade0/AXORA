@@ -30,7 +30,7 @@ const CAT_CASA=['casa','mant','predial','renta'];
 const METODOS=['Transferencia SPEI','Tarjeta de débito','Tarjeta de crédito','Efectivo','Tarjeta de vales','Depósito en ventanilla','Cargo domiciliado'];
 const VALES='Tarjeta de vales';
 const SUBS=['Amazon Prime','Netflix','Spotify','Disney+','Max','YouTube Premium','iCloud+','Apple Music','Canva','Gimnasio'];
-const NOMBRES=['Nácar','Peonía','Alhaja','Rosa Dorada','Champán','Cuarzo','Lumbre','Vané'];
+const NOMBRES=['AXORA','Nácar','Peonía','Alhaja','Rosa Dorada','Champán','Cuarzo','Lumbre','Vané'];
 const catDe=id=>[...CATS.gasto,...CATS.ingreso].find(c=>c.id===id)||{id:'otros',n:'Sin categoría',c:'#a3969a'};
 const VISTAS=[['inicio','Inicio'],['movimientos','Movimientos'],['capturas','Capturas'],['pagos','Pagos'],['inversion','Inversión'],['casa','Casa'],['plan','Plan'],['ajustes','Ajustes']];
 const EN_MAS=['inversion','casa','plan','ajustes'];
@@ -113,7 +113,7 @@ function aplicarTema(t,guardar){
 }
 
 /* ---------- estado ---------- */
-const AJ_DEF=()=>({nombreApp:'Nácar',logo:'',sueldo:0,vales:0,frecuencia:'quincenal',anios:[],presupuestos:{},
+const AJ_DEF=()=>({nombreApp:'',logo:'',sueldo:0,vales:0,frecuencia:'quincenal',anios:[],presupuestos:{},
   casa:{nombre:'Mi casa',precio:0,enganche:0,credito:0,saldo:0,saldoFecha:'',mensualidad:0,diaPago:0,diaPago2:0,diaFin:0,captura:true,plazo:0,institucion:''},
   renta:{estado:'buscando',monto:0,inquilino:'',diaPago:0,deposito:0,inicio:'',fin:''}});
 const S={modo:'cargando',dueno:true,vista:'inicio',ym:hoy().slice(0,7),libro:{},fijos:[],metas:[],proyectos:[],aj:AJ_DEF(),
@@ -137,7 +137,7 @@ function optsPer(base){
   for(let i=-2;i<=2;i++){const d=new Date(y,m-1+i,1),v=d.getFullYear()+'-'+p2(d.getMonth()+1);h+=`<option value="${v}" ${i===0?'selected':''}>${Mes(v)}</option>`}
   return h;
 }
-const VERSION='5 oct 2026 · v8';
+const VERSION='13 oct 2026 · v10';
 // Pagos del mismo concepto ya registrados que podrían ser el cobro de este mes hecho por adelantado.
 // cercanos: últimos 10 días del mes anterior (se preguntan antes de abrir el formulario).
 // recientes: últimos dos meses (se ofrecen dentro del formulario, junto a las capturas).
@@ -177,6 +177,11 @@ async function moverA(id,y,pid){
     const p=S.proyectos.find(x=>x.id===pid);toast(p?'Movido a '+p.nombre:'Quedó sin proyecto');pintar()}
   catch(e){toast(msgError(e))}
 }
+// Mensaje claro cuando no se puede hablar con Supabase (sin internet o proyecto en pausa).
+const PAUSA='No se pudo conectar con tu base de datos. Si llevas varios días sin abrir la app, tu proyecto de Supabase se pausó: entra a supabase.com, abre el proyecto y presiona "Restore project". Tarda unos minutos y tus datos siguen ahí.';
+const sinConexion=e=>{const m=String((e&&e.message)||''),st=+((e&&(e.status||e.statusCode))||0);return st===0||st>=500||/fetch|network|load failed|timeout|retryable/i.test(m)};
+const nombreGuardado=()=>{try{return localStorage.getItem('nombreApp')||''}catch(e){return ''}};
+const nombreApp=()=>S.aj.nombreApp||nombreGuardado()||'AXORA';
 const puedeFotos=()=>S.modo!=='db'||!!assets;
 const casaVirtual=()=>S.aj.casa.mensualidad>0&&!S.fijos.some(f=>f.cat==='casa');
 const fechaObj=f=>{const [y,m,d]=f.split('-').map(Number);return new Date(y,m-1,d)};
@@ -251,6 +256,8 @@ function suscribir(){
   db.doc('ajustes/principal').onSnapshot(s=>{
     const d=s.exists?clon(s.data()):{},b=AJ_DEF();
     S.aj={...b,...d,casa:{...b.casa,...(d.casa||{})},renta:{...b.renta,...(d.renta||{})},presupuestos:{...(d.presupuestos||{})},anios:[...(d.anios||[])]};
+    if(S.aj.nombreApp){try{localStorage.setItem('nombreApp',S.aj.nombreApp)}catch(e){}}
+    document.title=nombreApp();
     asegurarAnios();pintar();
   },errSub);
   const col=(n,k)=>db.collection(n).limit(500).onSnapshot(q=>{S[k]=q.docs.map(d=>({id:d.id,...clon(d.data())}));pintar()},errSub);
@@ -305,7 +312,7 @@ let pend=false;
 function pintar(){if(pend)return;pend=true;setTimeout(()=>{pend=false;pintarAhora()},0)}
 function aviso(t){$('aviso').innerHTML=t?`<div class="aviso">${esc(t)}</div>`:''}
 function toast(t){const e=$('toast');e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>{e.hidden=true},2600)}
-function marcaHtml(){return (S.aj.logo?`<img data-logo data-fid="${esc(S.aj.logo)}" src="${esc(fotoUrl(S.aj.logo))}" alt="">`:'<i></i>')+`<span>${esc(S.aj.nombreApp||'Nácar')}</span>`}
+function marcaHtml(){return (S.aj.logo?`<img data-logo data-fid="${esc(S.aj.logo)}" src="${esc(fotoUrl(S.aj.logo))}" alt="">`:'<i></i>')+`<span>${esc(nombreApp())}</span>`}
 function marco(){
   const n=avisosHoy().length,v=S.vista;
   const btn=(id,t,on,icono)=>`<button type="button" data-a="ir" data-v="${id}" class="${on?'on':''}" ${on?'aria-current="page"':''}>${ic(icono||id)}<span>${t}</span>${id==='pagos'&&n?`<span class="globo" aria-label="${n} pagos por hacer">${n}</span>`:''}</button>`;
@@ -596,7 +603,7 @@ function vAjustes(){
   const n=todos().length,u=S.uso,seg=(v,t)=>`<button type="button" data-a="tema" data-val="${v}" class="${tema===v?'on':''}">${t}</button>`;
   return `<div class="pila">
     <div><div class="sec-t"><h2>Nombre y logo</h2><button type="button" class="enlace" data-a="marca">Editar</button></div>
-      <div class="panel pad" style="display:flex;gap:16px;align-items:center">${S.aj.logo?`<img class="logo-prev" data-logo data-fid="${esc(S.aj.logo)}" src="${esc(fotoUrl(S.aj.logo))}" alt="Tu logo">`:'<div class="logo-vacio">Sin logo</div>'}<div><b style="font-family:var(--f-display);font-size:26px">${esc(S.aj.nombreApp||'Nácar')}</b><p style="color:var(--muted)">Tu logo y el nombre aparecen arriba en el teléfono y en el menú de la laptop.</p></div></div></div>
+      <div class="panel pad" style="display:flex;gap:16px;align-items:center">${S.aj.logo?`<img class="logo-prev" data-logo data-fid="${esc(S.aj.logo)}" src="${esc(fotoUrl(S.aj.logo))}" alt="Tu logo">`:'<div class="logo-vacio">Sin logo</div>'}<div><b style="font-family:var(--f-display);font-size:26px">${esc(nombreApp())}</b><p style="color:var(--muted)">Tu logo y el nombre aparecen arriba en el teléfono y en el menú de la laptop.</p></div></div></div>
     <div><div class="sec-t"><h2>Apariencia</h2></div>
       <div class="panel pad"><div class="seg" role="group" aria-label="Modo">${seg('auto','Automático')}${seg('claro','Claro')}${seg('oscuro','Oscuro')}</div><p style="margin-top:10px;color:var(--muted);font-size:13px">Automático sigue el modo de tu dispositivo. La elección se guarda en cada dispositivo por separado.</p></div></div>
     <div><div class="sec-t"><h2>Tu ingreso</h2><button type="button" class="enlace" data-a="sueldo">Editar</button></div>
@@ -715,7 +722,7 @@ const FORMS={
     if(!correo||!clave)return errF('Escribe tu correo y tu contraseña.');
     ocupado(true);
     try{await Backend.entrar(correo,clave)}
-    catch(e){console.error(e);ocupado(false);return errF(/invalid login|invalid credentials/i.test(String(e&&e.message))?'Correo o contraseña incorrectos.':'No se pudo iniciar sesión. Revisa tu conexión.')}
+    catch(e){console.error(e);ocupado(false);const m=String((e&&e.message)||'');return errF(/invalid login|invalid credentials/i.test(m)?'Correo o contraseña incorrectos.':/not confirmed/i.test(m)?'Tu correo no está confirmado. En Supabase, Authentication → Users, confirma tu usuaria.':sinConexion(e)?PAUSA:'No se pudo iniciar sesión: '+m)}
     abrir();
   },
   async mov(form){
@@ -849,7 +856,7 @@ function formPresupuesto(){const p=S.aj.presupuestos||{};abrirHoja('Límites por
   ${CATS.gasto.map(c=>campo('p-'+c.id,esc(c.n),inDinero('p-'+c.id,p[c.id]))).join('')}
   ${pieForm('Guardar')}</form>`)}
 function formMarca(){abrirHoja('Nombre y logo',`<form class="form" data-f="marca" novalidate>
-  ${campo('n-app','Nombre de tu app',`<input type="text" id="n-app" name="n-app" value="${esc(S.aj.nombreApp||'Nácar')}" maxlength="24">`)}
+  ${campo('n-app','Nombre de tu app',`<input type="text" id="n-app" name="n-app" value="${esc(nombreApp())}" maxlength="24">`)}
   <div class="sugerencias">${NOMBRES.map(n=>`<button type="button" class="chip" data-a="sugerir" data-campo="n-app" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>
   <div class="campo"><span>Tu logo</span>
     <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><span id="logo-prev">${S.aj.logo?`<img class="logo-prev" data-logo data-fid="${esc(S.aj.logo)}" src="${esc(fotoUrl(S.aj.logo))}" alt="Logo actual">`:'<div class="logo-vacio">Sin logo</div>'}</span>
@@ -985,7 +992,7 @@ document.addEventListener('error',e=>{const t=e.target;if(!t||t.tagName!=='IMG')
 function puerta(tipo,msg){
   const p=$('puerta'),c=$('puerta-c');
   if(!tipo){p.hidden=true;c.innerHTML='';return}
-  c.innerHTML=`<div class="marca"><i></i><span>Nácar</span></div>`+({
+  c.innerHTML=`<div class="marca"><i></i><span>${esc(nombreApp())}</span></div>`+({
     cargando:`<p class="puerta-t">Abriendo tus datos…</p>`,
     login:`<form class="form" data-f="login" novalidate>
       <p class="puerta-t">Inicia sesión para ver tus finanzas.</p>
@@ -1004,7 +1011,7 @@ function puerta(tipo,msg){
 async function abrir(){
   puerta('cargando');
   try{await Backend.cargar()}
-  catch(e){console.error(e);return puerta('error',/relation|does not exist|schema cache/i.test(String(e&&e.message))?'Parece que falta crear la tabla. Ejecuta supabase/esquema.sql en el editor SQL de tu proyecto.':'Revisa tu conexión a internet y vuelve a intentarlo.')}
+  catch(e){console.error(e);return puerta('error',/relation|does not exist|schema cache/i.test(String(e&&e.message))?'Parece que falta crear la tabla. Ejecuta supabase/esquema.sql en el editor SQL de tu proyecto.':PAUSA)}
   db=Backend.db();assets=Backend.assets;S.modo='db';puerta(null);suscribir();pintar();
   if(S.vista==='ajustes')medirEspacio();
 }
