@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nácar Finanzas</title>
+<meta name="description" content="Mis finanzas personales: pagos con capturas, suscripciones, inversión y casa.">
+<meta name="theme-color" content="#fffdfb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#191114" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Nácar">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Jost:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="estilos.css?v=8">
+</head>
+<body>
+<div class="app">
+  <nav class="riel" id="riel" aria-label="Secciones"></nav>
+  <main class="principal">
+    <header class="tope">
+      <div class="marca solo-movil" id="marca-movil"></div>
+      <h1 id="titulo" class="solo-ancho">Inicio</h1>
+      <div class="mes" role="group" aria-label="Mes">
+        <button type="button" data-a="mes" data-d="-1" aria-label="Mes anterior" id="mes-ant"></button>
+        <b id="mes-txt"></b>
+        <button type="button" data-a="mes" data-d="1" aria-label="Mes siguiente" id="mes-sig"></button>
+      </div>
+      <button type="button" class="icono-btn" data-a="tema-cambiar" aria-label="Cambiar entre modo claro y oscuro" id="btn-tema"></button>
+      <button type="button" class="btn pri solo-ancho" data-a="nuevo" id="btn-nuevo"></button>
+    </header>
+    <div id="aviso"></div>
+    <section id="vista" aria-live="polite"></section>
+  </main>
+</div>
+<nav class="pestanas" id="pestanas" aria-label="Secciones"></nav>
+<button type="button" class="fab" data-a="nuevo" aria-label="Nuevo movimiento" id="fab"></button>
+<div class="capa" id="capa" hidden><div class="hoja" role="dialog" aria-modal="true" aria-labelledby="hoja-t"><header><h2 id="hoja-t"></h2><button type="button" class="icono-btn" data-a="cerrar" aria-label="Cerrar" id="hoja-x"></button></header><div id="hoja-c"></div></div></div>
+<div class="visor" id="visor" hidden></div>
+<div class="toast" id="toast" hidden></div>
+
+<div class="puerta" id="puerta" hidden><div class="puerta-caja" id="puerta-c"></div></div>
+
+<script src="js/vendor/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/backend.js?v=8"></script>
+<script src="js/app.js?v=8"></script>
+</body>
+</html>
