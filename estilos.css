@@ -273,3 +273,13 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;background
   .arr .mov{padding-left:16px}
   .arr-acc{justify-content:flex-end;padding:0 16px 12px}
 }
+
+/* logo de AXORA (la A) cuando no has subido otro en Ajustes */
+.marca img.logo-def{border:0;border-radius:0;background:transparent;object-fit:contain;width:auto;height:34px}
+.riel .marca img.logo-def{height:40px}
+.puerta-caja .marca img.logo-def{height:46px}
+
+.puerta-links{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.puerta-caja input[type=password]{width:100%}
+
+input[type=color]{width:72px;height:46px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:4px;cursor:pointer}

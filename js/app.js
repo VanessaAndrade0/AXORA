@@ -2,7 +2,7 @@
 /* ---------- catálogo ---------- */
 const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const MES_C=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-const CATS={
+const CATS_BASE={
   gasto:[
     {id:'casa',n:'Mensualidad de la casa',c:'#c6a15b'},
     {id:'mant',n:'Cuota de mantenimiento',c:'#a8854a'},
@@ -26,12 +26,24 @@ const CATS={
     {id:'apoyo',n:'Apoyo o regalo',c:'#4fa58c'},
     {id:'otro_ing',n:'Otros ingresos',c:'#a3969a'}]
 };
+// Categorías: las de base más tus cambios (nombre, color, ocultas) y las que agregues, guardadas en ajustes.
+const CATS={gasto:[],ingreso:[]},CATS_TODAS={gasto:[],ingreso:[]};
+const CAT_FIJAS=['casa','mant','predial','inversion','suscripciones','ahorro','sueldo','renta','negocio'];
+const colorOk=c=>/^#[0-9a-f]{6}$/i.test(String(c||''))?c:'#a3969a';
+function aplicarCats(conf){
+  conf=conf||{};const cam=conf.cambios||{},nuevas=conf.nuevas||{};
+  ['gasto','ingreso'].forEach(t=>{
+    CATS_TODAS[t]=[...CATS_BASE[t].map(c=>({...c,...(cam[c.id]||{}),base:true})),...(nuevas[t]||[]).map(c=>({...c}))].map(c=>({...c,n:String(c.n||'Sin nombre'),c:colorOk(c.c)}));
+    CATS[t]=CATS_TODAS[t].filter(c=>!c.oculta);
+  });
+}
+aplicarCats();
 const CAT_CASA=['casa','mant','predial','renta'];
 const METODOS=['Transferencia SPEI','Tarjeta de débito','Tarjeta de crédito','Efectivo','Tarjeta de vales','Depósito en ventanilla','Cargo domiciliado'];
 const VALES='Tarjeta de vales';
 const SUBS=['Amazon Prime','Netflix','Spotify','Disney+','Max','YouTube Premium','iCloud+','Apple Music','Canva','Gimnasio'];
 const NOMBRES=['AXORA','Nácar','Peonía','Alhaja','Rosa Dorada','Champán','Cuarzo','Lumbre','Vané'];
-const catDe=id=>[...CATS.gasto,...CATS.ingreso].find(c=>c.id===id)||{id:'otros',n:'Sin categoría',c:'#a3969a'};
+const catDe=id=>[...CATS_TODAS.gasto,...CATS_TODAS.ingreso].find(c=>c.id===id)||{id:'otros',n:'Sin categoría',c:'#a3969a'};
 const VISTAS=[['inicio','Inicio'],['movimientos','Movimientos'],['capturas','Capturas'],['pagos','Pagos'],['inversion','Inversión'],['casa','Casa'],['plan','Plan'],['ajustes','Ajustes']];
 const EN_MAS=['inversion','casa','plan','ajustes'];
 const IC={
@@ -113,7 +125,7 @@ function aplicarTema(t,guardar){
 }
 
 /* ---------- estado ---------- */
-const AJ_DEF=()=>({nombreApp:'',logo:'',sueldo:0,vales:0,frecuencia:'quincenal',anios:[],presupuestos:{},
+const AJ_DEF=()=>({nombreApp:'',categorias:{},logo:'',sueldo:0,vales:0,frecuencia:'quincenal',anios:[],presupuestos:{},
   casa:{nombre:'Mi casa',precio:0,enganche:0,credito:0,saldo:0,saldoFecha:'',mensualidad:0,diaPago:0,diaPago2:0,diaFin:0,captura:true,plazo:0,institucion:''},
   renta:{estado:'buscando',monto:0,inquilino:'',diaPago:0,deposito:0,inicio:'',fin:''}});
 const S={modo:'cargando',dueno:true,vista:'inicio',ym:hoy().slice(0,7),libro:{},fijos:[],metas:[],proyectos:[],aj:AJ_DEF(),
@@ -137,7 +149,7 @@ function optsPer(base){
   for(let i=-2;i<=2;i++){const d=new Date(y,m-1+i,1),v=d.getFullYear()+'-'+p2(d.getMonth()+1);h+=`<option value="${v}" ${i===0?'selected':''}>${Mes(v)}</option>`}
   return h;
 }
-const VERSION='13 oct 2026 · v10';
+const VERSION='27 oct 2026 · v13';
 // Pagos del mismo concepto ya registrados que podrían ser el cobro de este mes hecho por adelantado.
 // cercanos: últimos 10 días del mes anterior (se preguntan antes de abrir el formulario).
 // recientes: últimos dos meses (se ofrecen dentro del formulario, junto a las capturas).
@@ -166,7 +178,7 @@ const sinId=m=>{const c=clon(m);delete c.id;return c};
 const abonosDe=id=>todos().filter(m=>m.abonoDe===id);
 const pagadoDe=m=>m.monto+total(abonosDe(m.id));
 const debeDe=m=>m.total>0?Math.max(0,Math.round((m.total-pagadoDe(m))*100)/100):0;
-const tipoDeCat=cat=>CATS.ingreso.some(c=>c.id===cat)?'ingreso':'gasto';
+const tipoDeCat=cat=>CATS_TODAS.ingreso.some(c=>c.id===cat)?'ingreso':'gasto';
 const optsCatTodo=sel=>`<optgroup label="Pagos y gastos">${optsCat('gasto',sel)}</optgroup><optgroup label="Ingresos">${optsCat('ingreso',sel)}</optgroup>`;
 async function moverA(id,y,pid){
   const m=delAnio(y).find(x=>x.id===id);if(!m)return;
@@ -182,6 +194,19 @@ const PAUSA='No se pudo conectar con tu base de datos. Si llevas varios días si
 const sinConexion=e=>{const m=String((e&&e.message)||''),st=+((e&&(e.status||e.statusCode))||0);return st===0||st>=500||/fetch|network|load failed|timeout|retryable/i.test(m)};
 const nombreGuardado=()=>{try{return localStorage.getItem('nombreApp')||''}catch(e){return ''}};
 const nombreApp=()=>S.aj.nombreApp||nombreGuardado()||'AXORA';
+function msgAuth(e){
+  const m=String((e&&e.message)||'');
+  if(/invalid login|invalid credentials/i.test(m))return 'Correo o contraseña incorrectos.';
+  if(/not confirmed/i.test(m))return 'Todavía no confirmas tu correo. Abre el correo de confirmación que te llegó y toca el enlace.';
+  if(/signups? not allowed|signup.*disabled/i.test(m))return 'El registro de cuentas nuevas está cerrado. Se activa en Supabase: Authentication → Sign In / Providers → Allow new users to sign up.';
+  if(/rate limit|too many/i.test(m))return 'Se mandaron demasiados correos seguidos. Espera un rato (hasta una hora) y vuelve a intentarlo.';
+  if(/password.*(at least|characters|weak)/i.test(m))return 'La contraseña es muy corta. Usa al menos 8 caracteres.';
+  if(/same.*password|different from the old/i.test(m))return 'La contraseña nueva tiene que ser distinta a la anterior.';
+  if(/already registered|already exists/i.test(m))return 'Ese correo ya tiene cuenta. Inicia sesión o recupera tu contraseña.';
+  if(sinConexion(e))return PAUSA;
+  return 'No se pudo completar: '+m;
+}
+const correoValido=c=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c);
 const puedeFotos=()=>S.modo!=='db'||!!assets;
 const casaVirtual=()=>S.aj.casa.mensualidad>0&&!S.fijos.some(f=>f.cat==='casa');
 const fechaObj=f=>{const [y,m,d]=f.split('-').map(Number);return new Date(y,m-1,d)};
@@ -256,6 +281,7 @@ function suscribir(){
   db.doc('ajustes/principal').onSnapshot(s=>{
     const d=s.exists?clon(s.data()):{},b=AJ_DEF();
     S.aj={...b,...d,casa:{...b.casa,...(d.casa||{})},renta:{...b.renta,...(d.renta||{})},presupuestos:{...(d.presupuestos||{})},anios:[...(d.anios||[])]};
+    aplicarCats(S.aj.categorias);
     if(S.aj.nombreApp){try{localStorage.setItem('nombreApp',S.aj.nombreApp)}catch(e){}}
     document.title=nombreApp();
     asegurarAnios();pintar();
@@ -312,7 +338,7 @@ let pend=false;
 function pintar(){if(pend)return;pend=true;setTimeout(()=>{pend=false;pintarAhora()},0)}
 function aviso(t){$('aviso').innerHTML=t?`<div class="aviso">${esc(t)}</div>`:''}
 function toast(t){const e=$('toast');e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>{e.hidden=true},2600)}
-function marcaHtml(){return (S.aj.logo?`<img data-logo data-fid="${esc(S.aj.logo)}" src="${esc(fotoUrl(S.aj.logo))}" alt="">`:'<i></i>')+`<span>${esc(nombreApp())}</span>`}
+function marcaHtml(){return (S.aj.logo?`<img data-logo data-fid="${esc(S.aj.logo)}" src="${esc(fotoUrl(S.aj.logo))}" alt="">`:'<img class="logo-def" src="icons/logo-a.png" alt="">')+`<span>${esc(nombreApp())}</span>`}
 function marco(){
   const n=avisosHoy().length,v=S.vista;
   const btn=(id,t,on,icono)=>`<button type="button" data-a="ir" data-v="${id}" class="${on?'on':''}" ${on?'aria-current="page"':''}>${ic(icono||id)}<span>${t}</span>${id==='pagos'&&n?`<span class="globo" aria-label="${n} pagos por hacer">${n}</span>`:''}</button>`;
@@ -434,7 +460,7 @@ function vMovs(){
     </div>
     <div class="filtros">
       <input type="search" id="f-q" placeholder="Buscar por concepto, folio o nota" value="${esc(f.q)}" aria-label="Buscar">
-      <select id="f-cat" aria-label="Categoría"><option value="">Todas las categorías</option>${[...CATS.gasto,...CATS.ingreso].map(c=>`<option value="${c.id}" ${f.cat===c.id?'selected':''}>${esc(c.n)}</option>`).join('')}</select>
+      <select id="f-cat" aria-label="Categoría"><option value="">Todas las categorías</option>${[...CATS_TODAS.gasto,...CATS_TODAS.ingreso].map(c=>`<option value="${c.id}" ${f.cat===c.id?'selected':''}>${esc(c.n)}</option>`).join('')}</select>
     </div>
     <div id="lista">${listaMovs()}</div>`;
 }
@@ -606,6 +632,8 @@ function vAjustes(){
       <div class="panel pad" style="display:flex;gap:16px;align-items:center">${S.aj.logo?`<img class="logo-prev" data-logo data-fid="${esc(S.aj.logo)}" src="${esc(fotoUrl(S.aj.logo))}" alt="Tu logo">`:'<div class="logo-vacio">Sin logo</div>'}<div><b style="font-family:var(--f-display);font-size:26px">${esc(nombreApp())}</b><p style="color:var(--muted)">Tu logo y el nombre aparecen arriba en el teléfono y en el menú de la laptop.</p></div></div></div>
     <div><div class="sec-t"><h2>Apariencia</h2></div>
       <div class="panel pad"><div class="seg" role="group" aria-label="Modo">${seg('auto','Automático')}${seg('claro','Claro')}${seg('oscuro','Oscuro')}</div><p style="margin-top:10px;color:var(--muted);font-size:13px">Automático sigue el modo de tu dispositivo. La elección se guarda en cada dispositivo por separado.</p></div></div>
+    <div><div class="sec-t"><h2>Categorías</h2><button type="button" class="enlace" data-a="cat-nueva">Agregar categoría</button></div>
+      <div class="panel">${['gasto','ingreso'].map(t=>`<div class="dia">${t==='gasto'?'Pagos y gastos':'Ingresos'}</div>${CATS_TODAS[t].map(c=>`<button type="button" class="fila" data-a="cat-editar" data-id="${esc(c.id)}" data-t="${t}"><span class="punto" style="--c:${c.c}"></span><div class="cuerpo"><b>${esc(c.n)}</b>${c.oculta?'<small>Oculta</small>':''}</div>${ic('der',18)}</button>`).join('')}`).join('')}</div></div>
     <div><div class="sec-t"><h2>Tu ingreso</h2><button type="button" class="enlace" data-a="sueldo">Editar</button></div>
       <div class="panel pad"><div class="datos"><div><span>Sueldo mensual</span><b>${S.aj.sueldo?$m(S.aj.sueldo):'Sin capturar'}</b></div><div><span>Te pagan</span><b style="text-transform:capitalize">${esc(S.aj.frecuencia||'quincenal')}</b></div><div><span>Vales al mes</span><b>${S.aj.vales?$m(S.aj.vales):'Sin capturar'}</b></div></div></div></div>
     <div><div class="sec-t"><h2>Respaldo</h2></div>
@@ -617,7 +645,7 @@ function vAjustes(){
     <div><div class="sec-t"><h2>Privacidad</h2></div>
       <div class="panel pad"><p style="color:var(--muted)">Tus datos y capturas viven en tu propio proyecto de Supabase y solo se abren con tu correo y contraseña. Verás lo mismo en tu laptop y en tu iPhone.</p><p style="color:var(--muted);margin-top:8px;font-size:13px">Versión ${VERSION}</p></div></div>
     ${S.modo==='db'?`<div><div class="sec-t"><h2>Sesión</h2></div>
-      <div class="panel pad" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:160px;overflow-wrap:anywhere">${esc(Backend.correo())}</span><button type="button" class="btn" data-a="salir">Cerrar sesión</button></div></div>`:''}
+      <div class="panel pad" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:160px;overflow-wrap:anywhere">${esc(Backend.correo())}</span><button type="button" class="btn" data-a="cambiar-clave">Cambiar contraseña</button><button type="button" class="btn" data-a="salir">Cerrar sesión</button></div></div>`:''}
   </div>`;
 }
 
@@ -631,7 +659,7 @@ const casilla=(id,txt,on)=>`<label class="casilla" for="${id}"><input type="chec
 const pieForm=(txt,extra='')=>`<p class="error" id="frm-error" hidden></p><p class="estado" id="frm-estado" hidden></p><div class="pie">${extra}<button type="button" class="btn" data-a="cerrar">Cancelar</button><button type="submit" class="btn pri" id="frm-ok">${txt}</button></div>`;
 function errF(t){const e=$('frm-error');if(e){e.textContent=t;e.hidden=false}}
 function ocupado(si,t){const b=$('frm-ok'),e=$('frm-estado');if(b)b.disabled=si;if(e){e.textContent=t||'';e.hidden=!t}}
-const optsCat=(tipo,sel)=>CATS[tipo].map(c=>`<option value="${c.id}" ${sel===c.id?'selected':''}>${esc(c.n)}</option>`).join('');
+const optsCat=(tipo,sel)=>[...CATS[tipo],...CATS_TODAS[tipo].filter(c=>c.oculta&&c.id===sel)].map(c=>`<option value="${c.id}" ${sel===c.id?'selected':''}>${esc(c.n)}</option>`).join('');
 function fechaSugerida(){const h=hoy();return h.startsWith(S.ym)?h:S.ym+'-01'}
 
 function abrirMov(pre,edit){
@@ -648,7 +676,13 @@ function abrirMov(pre,edit){
     </div></div>
     <div class="par2">${campo('monto','Monto (MXN)',inDinero('monto',m.monto,true))}${campo('fecha','Fecha',`<input type="date" id="fecha" name="fecha" value="${esc(m.fecha)}" required>`)}</div>
     ${campo('cat','Categoría',`<select id="cat" name="cat">${optsCatTodo(m.cat)}</select>`)}
-    <div id="campo-fijo">${campo('fijoId','¿Es uno de tus pagos fijos o suscripciones?',`<select id="fijoId" name="fijoId"><option value="">No</option>${S.fijos.map(f=>`<option value="${esc(f.id)}" ${m.fijoId===f.id?'selected':''}>${esc(f.nombre)}</option>`).join('')}</select>`)}</div>
+    <div id="campo-fijo">${campo('fijoId','¿Es uno de tus pagos fijos o suscripciones?',`<select id="fijoId" name="fijoId"><option value="">No</option>${S.fijos.map(f=>`<option value="${esc(f.id)}" ${m.fijoId===f.id?'selected':''}>${esc(f.nombre)}</option>`).join('')}<option value="__nuevo">＋ Agregarlo como nuevo pago fijo o suscripción</option></select>`)}</div>
+    <div id="campo-nuevofijo" class="req" style="display:flex;flex-direction:column;gap:12px" hidden>
+      <b>Nuevo pago fijo o suscripción</b>
+      <div class="par2">${campo('nf-nombre','Nombre',`<input type="text" id="nf-nombre" name="nf-nombre" maxlength="50" placeholder="Ej. Claude">`)}${campo('nf-clase','Es',`<select id="nf-clase" name="nf-clase"><option value="suscripcion">Suscripción</option><option value="pago">Pago fijo</option></select>`)}</div>
+      ${campo('nf-dia','Día del cobro cada mes',inDia('nf-dia',''))}
+      <small>Se guarda con el monto de este movimiento. Después lo puedes cambiar o eliminar en Pagos.</small>
+    </div>
     <div id="campo-per">${campo('periodo','Corresponde al mes de',`<select id="periodo" name="periodo">${optsPer(m.periodo||m.fecha.slice(0,7))}</select>`,'Si te lo cobraron antes (por ejemplo el día 29 por el cobro del día 1), deja la fecha real y elige aquí el mes que cubre.')}</div>
     <div id="campo-total">${campo('total','Precio total, si la pagas en partes',inDinero('total',m.total),'Opcional. En Monto pon solo lo que ya pagaste; lo que falta sale como "Por pagar" en el proyecto y luego lo vas abonando.')}</div>
     <div id="campo-proy">${campo('proyectoId','Proyecto',`<select id="proyectoId" name="proyectoId"><option value="">Sin proyecto</option>${S.proyectos.map(p=>`<option value="${esc(p.id)}" ${m.proyectoId===p.id?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select>`)}</div>
@@ -669,7 +703,8 @@ function abrirMov(pre,edit){
 function ajustarForm(){
   const f=$('hoja-c').querySelector('form[data-f=mov]');if(!f)return;
   const tipo=f.querySelector('input[name=tipo]:checked').value,cat=$('cat').value;
-  $('campo-fijo').hidden=tipo!=='gasto'||!S.fijos.length;
+  $('campo-fijo').hidden=tipo!=='gasto';
+  $('campo-nuevofijo').hidden=!(tipo==='gasto'&&$('fijoId').value==='__nuevo');
   $('campo-proy').hidden=!enProyecto({tipo,cat});
   $('campo-total').hidden=!(tipo==='gasto'&&cat==='inversion'&&!F.abonoDe);
   $('campo-per').hidden=!(tipo==='gasto'&&($('fijoId').value||cat==='casa'));
@@ -722,12 +757,39 @@ const FORMS={
     if(!correo||!clave)return errF('Escribe tu correo y tu contraseña.');
     ocupado(true);
     try{await Backend.entrar(correo,clave)}
-    catch(e){console.error(e);ocupado(false);const m=String((e&&e.message)||'');return errF(/invalid login|invalid credentials/i.test(m)?'Correo o contraseña incorrectos.':/not confirmed/i.test(m)?'Tu correo no está confirmado. En Supabase, Authentication → Users, confirma tu usuaria.':sinConexion(e)?PAUSA:'No se pudo iniciar sesión: '+m)}
+    catch(e){console.error(e);ocupado(false);return errF(msgAuth(e))}
     abrir();
+  },
+  async registro(form){
+    const d=new FormData(form),correo=String(d.get('r-correo')||'').trim(),clave=String(d.get('r-clave')||''),clave2=String(d.get('r-clave2')||'');
+    if(!correoValido(correo))return errF('Escribe un correo válido.');
+    if(clave.length<8)return errF('La contraseña debe tener al menos 8 caracteres.');
+    if(clave!==clave2)return errF('Las contraseñas no coinciden.');
+    ocupado(true);
+    let r;try{r=await Backend.registrar(correo,clave)}catch(e){console.error(e);ocupado(false);return errF(msgAuth(e))}
+    if(r==='listo')return abrir();
+    puerta('aviso',`Te mandamos un correo a ${correo}. Abre el enlace para confirmar tu cuenta y después inicia sesión. Si no lo ves, revisa la carpeta de spam.`);
+  },
+  async olvido(form){
+    const d=new FormData(form),correo=String(d.get('o-correo')||'').trim();
+    if(!correoValido(correo))return errF('Escribe el correo con el que entras.');
+    ocupado(true);
+    try{await Backend.recuperar(correo)}catch(e){console.error(e);ocupado(false);return errF(msgAuth(e))}
+    puerta('aviso',`Si ${correo} tiene cuenta, te llegará un correo con un enlace para poner una contraseña nueva. Ábrelo desde este mismo teléfono o computadora. Si no lo ves, revisa spam.`);
+  },
+  async nuevaClave(form){
+    const d=new FormData(form),clave=String(d.get('n-clave')||''),clave2=String(d.get('n-clave2')||'');
+    if(clave.length<8)return errF('La contraseña debe tener al menos 8 caracteres.');
+    if(clave!==clave2)return errF('Las contraseñas no coinciden.');
+    ocupado(true);
+    try{await Backend.cambiarClave(clave)}catch(e){console.error(e);ocupado(false);return errF(msgAuth(e))}
+    if(form.dataset.desde==='ajustes'){cerrarHoja();toast('Contraseña cambiada')}
+    else{toast('Contraseña cambiada');abrir()}
   },
   async mov(form){
     const d=new FormData(form),monto=num(d.get('monto')),fecha=String(d.get('fecha')||''),cat=String(d.get('cat')),tipo=tipoDeCat(cat),precio=tipo==='gasto'&&cat==='inversion'&&!F.abonoDe?num(d.get('total')):0;
-    const fijoId=tipo==='gasto'&&S.fijos.some(f=>f.id===d.get('fijoId'))?String(d.get('fijoId')):'';
+    const fijoId=tipo==='gasto'&&S.fijos.some(f=>f.id===d.get('fijoId'))?String(d.get('fijoId')):'',nuevoFijo=tipo==='gasto'&&d.get('fijoId')==='__nuevo';
+    if(nuevoFijo&&!String(d.get('nf-nombre')||'').trim())return errF('Ponle nombre al pago fijo o suscripción.');
     if(!(monto>0))return errF('Escribe un monto mayor a cero.');
     if(!/^\d{4}-\d{2}-\d{2}$/.test(fecha)||+fecha.slice(0,4)<2000||+fecha.slice(0,4)>2100)return errF('Elige una fecha válida.');
     if(pideCaptura(fijoId,tipo,cat)&&!(F.fotos.length+F.nuevas.length))return errF('Sube la captura de este pago. Sin captura no se marca como pagado.');
@@ -747,7 +809,14 @@ const FORMS={
         const n=F.nuevas[0];F.fotos.push(await subirFoto(n.file));URL.revokeObjectURL(n.url);F.nuevas.shift();
       }
       const doc={tipo,monto,fecha,cat,concepto:String(d.get('concepto')||'').trim(),metodo:String(d.get('metodo')||''),folio:String(d.get('folio')||'').trim(),nota:String(d.get('nota')||'').trim(),fotos:[...F.fotos],creado:F.creado||new Date().toISOString()};
-      if(fijoId)doc.fijoId=fijoId;
+      let fid=fijoId;
+      if(nuevoFijo){
+        const sub=d.get('nf-clase')!=='pago';
+        if(!F.nuevoFijoId)F.nuevoFijoId=db.collection('fijos').doc().id;
+        await db.doc('fijos/'+F.nuevoFijoId).set({nombre:String(d.get('nf-nombre')).trim(),monto,dia:dia31(d.get('nf-dia'))||+fecha.slice(8),diaFin:0,dia2:0,cat:sub?'suscripciones':cat,clase:sub?'suscripcion':'pago',captura:false,ciclo:'mensual',mes:1});
+        fid=F.nuevoFijoId;
+      }
+      if(fid)doc.fijoId=fid;
       const per=String(d.get('periodo')||'');
       if(tipo==='gasto'&&(fijoId||cat==='casa')&&/^\d{4}-\d{2}$/.test(per)&&per!==fecha.slice(0,7))doc.periodo=per;
       if(enProyecto(doc)&&S.proyectos.some(p=>p.id===d.get('proyectoId')))doc.proyectoId=String(d.get('proyectoId'));
@@ -757,6 +826,17 @@ const FORMS={
       F.quitar.forEach(borrarFoto);
       S.ym=doc.periodo||fecha.slice(0,7);asegurarAnios();cerrarHoja();toast('Movimiento guardado');pintar();
     }catch(e){if(F)F.enCurso=false;ocupado(false);fotosForm();errF(msgError(e))}
+  },
+  async categoria(form){
+    const d=new FormData(form),nombre=String(d.get('k-nombre')||'').trim(),color=colorOk(d.get('k-color'));
+    if(!nombre)return errF('Ponle nombre a la categoría.');
+    let id=form.dataset.id,t=form.dataset.t;
+    if([...CATS_TODAS.gasto,...CATS_TODAS.ingreso].some(c=>c.id!==id&&c.n.trim().toLowerCase()===nombre.toLowerCase()))return errF('Ya tienes una categoría con ese nombre.');
+    const conf=clon(S.aj.categorias||{});conf.cambios=conf.cambios||{};conf.nuevas=conf.nuevas||{};conf.nuevas.gasto=conf.nuevas.gasto||[];conf.nuevas.ingreso=conf.nuevas.ingreso||[];
+    if(!id){t=d.get('k-tipo')==='ingreso'?'ingreso':'gasto';conf.nuevas[t].push({id:'c_'+Date.now().toString(36),n:nombre,c:color})}
+    else{const oculta=!!d.get('k-oculta'),nv=conf.nuevas[t]&&conf.nuevas[t].find(x=>x.id===id);if(nv)Object.assign(nv,{n:nombre,c:color,oculta});else conf.cambios[id]={n:nombre,c:color,oculta}}
+    S.aj.categorias=conf;aplicarCats(conf);
+    await salvarAj('Categoría guardada');
   },
   async casa(form){
     const d=new FormData(form),c=S.aj.casa;
@@ -865,6 +945,17 @@ function formMarca(){abrirHoja('Nombre y logo',`<form class="form" data-f="marca
     ${S.aj.logo?`<button type="button" class="enlace" data-a="quitar-logo" style="align-self:flex-start">Quitar logo</button>`:''}
   </div>
   ${pieForm('Guardar')}</form>`)}
+function formCat(id,t){
+  const nueva=!id,c=nueva?{n:'',c:'#9a6fd0',oculta:false}:CATS_TODAS[t].find(x=>x.id===id);if(!c)return;
+  abrirHoja(nueva?'Nueva categoría':'Editar categoría',`<form class="form" data-f="categoria" data-id="${esc(id||'')}" data-t="${esc(t||'')}" novalidate>
+    ${nueva?campo('k-tipo','Tipo',`<select id="k-tipo" name="k-tipo"><option value="gasto">Pago o gasto</option><option value="ingreso">Ingreso</option></select>`):''}
+    ${campo('k-nombre','Nombre',`<input type="text" id="k-nombre" name="k-nombre" value="${esc(c.n)}" maxlength="40" placeholder="Ej. Mascotas">`)}
+    ${campo('k-color','Color',`<input type="color" id="k-color" name="k-color" value="${colorOk(c.c)}">`)}
+    ${nueva?'':casilla('k-oculta','Ocultarla: ya no aparece al registrar, pero tus movimientos anteriores la conservan',!!c.oculta)}
+    ${!nueva&&CAT_FIJAS.includes(id)?'<p style="color:var(--muted);font-size:13px">La app usa esta categoría en sus cuentas (casa, inversión, suscripciones o ingresos), así que le puedes cambiar el nombre y el color, u ocultarla, pero no eliminarla.</p>':''}
+    ${pieForm('Guardar',!nueva&&!c.base?`<button type="button" class="btn peligro" data-a="cat-borrar" data-id="${esc(id)}" data-t="${esc(t)}" style="margin-right:auto">Eliminar</button>`:'')}
+  </form>`);
+}
 function formFijo(id,clase){
   const f=S.fijos.find(x=>x.id===id)||{nombre:'',monto:'',dia:'',diaFin:'',cat:'mant',clase:clase||'pago',captura:clase!=='suscripcion',ciclo:'mensual',mes:new Date().getMonth()+1};
   const sub=f.clase==='suscripcion';
@@ -907,6 +998,11 @@ const ACC={
   cerrar:()=>cerrarHoja(),
   salir:async()=>{await Backend.salir();location.reload()},
   recargar:()=>location.reload(),
+  puerta:b=>puerta(b.dataset.v),
+  'cambiar-clave':()=>abrirHoja('Cambiar contraseña',`<form class="form" data-f="nuevaClave" data-desde="ajustes" novalidate>
+    ${campo('n-clave','Contraseña nueva',`<input type="password" autocomplete="new-password" id="n-clave" name="n-clave">`,'Al menos 8 caracteres.')}
+    ${campo('n-clave2','Repítela',`<input type="password" autocomplete="new-password" id="n-clave2" name="n-clave2">`)}
+    ${pieForm('Guardar contraseña')}</form>`),
   probar:()=>{db=memDb();S.modo='memoria';puerta(null);aviso('Modo de prueba: lo que captures aquí no se guarda. Conecta Supabase para guardar tus datos.');suscribir();pintar()},
   tema:b=>{aplicarTema(b.dataset.val,true);pintar()},
   'tema-cambiar':()=>{aplicarTema(esOscuro()?'claro':'oscuro',true);pintar()},
@@ -937,6 +1033,16 @@ const ACC={
   'abonar-compra':b=>{const m=delAnio(b.dataset.y).find(x=>x.id===b.dataset.id);if(m)abrirMov({tipo:'gasto',cat:'inversion',proyectoId:proyDe(m)?m.proyectoId:'',concepto:'Abono: '+(m.concepto||'compra'),abonoDe:m.id,metodo:m.metodo})},
   'mover-a':async b=>{const {id,y,p}=b.dataset;cerrarHoja();await moverA(id,y,p||'')},
   'pagar-fijo':b=>{const ym=b.dataset.ym||S.ym,f=fijosDe(ym).find(x=>x.id===b.dataset.id&&String(x.cuota||0)===(b.dataset.c||'0'));if(!f)return;S.ym=ym;registrarFijo(f,ym)},
+  'cat-nueva':()=>formCat(),
+  'cat-editar':b=>formCat(b.dataset.id,b.dataset.t),
+  'cat-borrar':async b=>{
+    const {id,t}=b.dataset;
+    if(todos().some(m=>m.cat===id)||S.fijos.some(f=>f.cat===id))return errF('Esta categoría ya tiene movimientos. Mejor márcala como oculta para no perderlos.');
+    if(b.dataset.seguro!=='1'){b.dataset.seguro='1';b.textContent='Sí, eliminar';return}
+    const conf=clon(S.aj.categorias||{});conf.nuevas=conf.nuevas||{};conf.nuevas[t]=(conf.nuevas[t]||[]).filter(x=>x.id!==id);
+    if(S.aj.presupuestos)delete S.aj.presupuestos[id];
+    S.aj.categorias=conf;aplicarCats(conf);await salvarAj('Categoría eliminada');
+  },
   'pagar-nuevo':()=>{if(PRE)abrirMov(PRE)},
   'usar-pago':async b=>{
     const y=b.dataset.y,ym=b.dataset.ym,m=delAnio(y).find(x=>x.id===b.dataset.id);if(!m)return;
@@ -970,6 +1076,7 @@ document.addEventListener('change',e=>{
   else if(t.id==='cat'){const r=$('t-'+tipoDeCat(t.value));if(r)r.checked=true;ajustarForm()}
   else if(t.id==='periodo'&&F)F.perFijo=true;
   else if(t.id==='fecha'&&F&&$('periodo'))ajustarForm();
+  else if(t.id==='fijoId'&&t.value==='__nuevo'){const d=$('fecha').value;if(!$('nf-nombre').value)$('nf-nombre').value=$('concepto').value||'';if(!$('nf-dia').value&&d)$('nf-dia').value=+d.slice(8);$('nf-clase').value=$('cat').value==='suscripciones'?'suscripcion':'pago';ajustarForm()}
   else if(t.id==='fijoId'){const f=S.fijos.find(x=>x.id===t.value);if(f){$('cat').value=f.cat;if(!$('monto').value)$('monto').value=f.monto;if(!$('concepto').value)$('concepto').value=f.nombre+' de '+mesDe(S.ym)}ajustarForm()}
   else if(t.id==='x-ciclo'){$('campo-mes').hidden=t.value!=='anual'}
   else if(t.id==='archivos'&&F){[...t.files].forEach(file=>F.nuevas.push({file,url:URL.createObjectURL(file)}));t.value='';fotosForm()}
@@ -992,14 +1099,37 @@ document.addEventListener('error',e=>{const t=e.target;if(!t||t.tagName!=='IMG')
 function puerta(tipo,msg){
   const p=$('puerta'),c=$('puerta-c');
   if(!tipo){p.hidden=true;c.innerHTML='';return}
-  c.innerHTML=`<div class="marca"><i></i><span>${esc(nombreApp())}</span></div>`+({
+  c.innerHTML=`<div class="marca"><img class="logo-def" src="icons/logo-a.png" alt=""><span>${esc(nombreApp())}</span></div>`+({
     cargando:`<p class="puerta-t">Abriendo tus datos…</p>`,
     login:`<form class="form" data-f="login" novalidate>
       <p class="puerta-t">Inicia sesión para ver tus finanzas.</p>
       ${campo('l-correo','Correo',`<input type="text" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" id="l-correo" name="l-correo">`)}
       ${campo('l-clave','Contraseña',`<input type="password" autocomplete="current-password" id="l-clave" name="l-clave">`)}
       <p class="error" id="frm-error" hidden></p>
-      <button type="submit" class="btn pri" id="frm-ok">Entrar</button></form>`,
+      <button type="submit" class="btn pri" id="frm-ok">Entrar</button>
+      <div class="puerta-links"><button type="button" class="enlace" data-a="puerta" data-v="olvido">¿Olvidaste tu contraseña?</button><button type="button" class="enlace" data-a="puerta" data-v="registro">Crear cuenta</button></div></form>`,
+    registro:`<form class="form" data-f="registro" novalidate>
+      <p class="puerta-t">Crea tu cuenta.</p>
+      ${campo('r-correo','Correo',`<input type="text" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" id="r-correo" name="r-correo">`)}
+      ${campo('r-clave','Contraseña',`<input type="password" autocomplete="new-password" id="r-clave" name="r-clave">`,'Al menos 8 caracteres.')}
+      ${campo('r-clave2','Repite la contraseña',`<input type="password" autocomplete="new-password" id="r-clave2" name="r-clave2">`)}
+      <p class="error" id="frm-error" hidden></p>
+      <button type="submit" class="btn pri" id="frm-ok">Crear cuenta</button>
+      <div class="puerta-links"><button type="button" class="enlace" data-a="puerta" data-v="login">Ya tengo cuenta</button></div></form>`,
+    olvido:`<form class="form" data-f="olvido" novalidate>
+      <p class="puerta-t">Recupera tu contraseña.</p>
+      <p class="puerta-n">Escribe tu correo y te mandamos un enlace para poner una contraseña nueva.</p>
+      ${campo('o-correo','Correo',`<input type="text" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" id="o-correo" name="o-correo">`)}
+      <p class="error" id="frm-error" hidden></p>
+      <button type="submit" class="btn pri" id="frm-ok">Mandar enlace</button>
+      <div class="puerta-links"><button type="button" class="enlace" data-a="puerta" data-v="login">Volver a iniciar sesión</button></div></form>`,
+    nueva:`<form class="form" data-f="nuevaClave" novalidate>
+      <p class="puerta-t">Escribe tu contraseña nueva.</p>
+      ${campo('n-clave','Contraseña nueva',`<input type="password" autocomplete="new-password" id="n-clave" name="n-clave">`,'Al menos 8 caracteres.')}
+      ${campo('n-clave2','Repítela',`<input type="password" autocomplete="new-password" id="n-clave2" name="n-clave2">`)}
+      <p class="error" id="frm-error" hidden></p>
+      <button type="submit" class="btn pri" id="frm-ok">Guardar contraseña</button></form>`,
+    aviso:`<p class="puerta-n">${esc(msg||'')}</p><button type="button" class="btn pri" data-a="puerta" data-v="login">Volver a iniciar sesión</button>`,
     config:`<p class="puerta-t">Falta conectar tu base de datos.</p>
       <p class="puerta-n">Abre <code>js/config.js</code> y pega la URL y la llave pública de tu proyecto de Supabase. Los pasos están en <code>LEEME.md</code>.</p>
       <button type="button" class="btn" data-a="probar">Probar sin guardar</button>`,
@@ -1031,6 +1161,7 @@ async function arrancar(){
   if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   let r={estado:'sin-config'};try{r=await Backend.iniciar()}catch(e){console.error(e)}
   if(r.estado==='listo')return abrir();
+  if(r.estado==='recuperar')return puerta('nueva');
   puerta(r.estado==='sin-sesion'?'login':'config');
 }
 arrancar();
